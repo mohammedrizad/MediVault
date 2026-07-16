@@ -1,0 +1,5 @@
+node_modules/
+.env
+.env.local
+dinesh-22aee-firebase-adminsdk-dbpeo-072e18a2b4.json
+*.log

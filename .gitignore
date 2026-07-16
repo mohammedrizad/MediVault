@@ -1,0 +1,18 @@
+node_modules/
+.env
+.env.local
+*.log
+.DS_Store
+Thumbs.db
+dinesh-22aee-firebase-adminsdk-dbpeo-072e18a2b4.json
+
+# Stray one-off local debug/setup scripts (not part of the app)
+BACKEND/get_credentials.js
+BACKEND/get_admin_credentials.js
+BACKEND/show_credentials.js
+BACKEND/list_all_admins.js
+BACKEND/update_admin_password.js
+BACKEND/create_ram_admin.js
+BACKEND/create_ram_admin_internal.js
+BACKEND/setup_med001.js
+BACKEND/create_admin.js
