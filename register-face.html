@@ -1,0 +1,372 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Register Your Face - MediVault</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+        }
+
+        .container {
+            background: white;
+            padding: 30px;
+            border-radius: 15px;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
+        }
+
+        h1 {
+            color: #333;
+            text-align: center;
+            margin-bottom: 30px;
+        }
+
+        .camera-section {
+            text-align: center;
+            margin: 20px 0;
+        }
+
+        video {
+            border: 3px solid #667eea;
+            border-radius: 10px;
+            width: 320px;
+            height: 240px;
+        }
+
+        canvas {
+            display: none;
+        }
+
+        .form-group {
+            margin: 15px 0;
+        }
+
+        label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: bold;
+            color: #333;
+        }
+
+        input,
+        select {
+            width: 100%;
+            padding: 10px;
+            border: 2px solid #ddd;
+            border-radius: 5px;
+            font-size: 16px;
+        }
+
+        button {
+            background: #667eea;
+            color: white;
+            padding: 12px 24px;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 16px;
+            margin: 10px 5px;
+            transition: background 0.3s;
+        }
+
+        button:hover {
+            background: #5a67d8;
+        }
+
+        button:disabled {
+            background: #ccc;
+            cursor: not-allowed;
+        }
+
+        .success {
+            background: #48bb78;
+            color: white;
+            padding: 15px;
+            border-radius: 8px;
+            margin: 20px 0;
+            display: none;
+        }
+
+        .error {
+            background: #f56565;
+            color: white;
+            padding: 15px;
+            border-radius: 8px;
+            margin: 20px 0;
+            display: none;
+        }
+
+        .captured-photo {
+            max-width: 200px;
+            border: 2px solid #667eea;
+            border-radius: 10px;
+            margin: 10px;
+        }
+
+        .step {
+            background: #f7fafc;
+            padding: 15px;
+            border-left: 4px solid #667eea;
+            margin: 15px 0;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="container">
+        <h1>🎭 Register Your Face for MediVault</h1>
+
+        <div class="step">
+            <strong>Step 1:</strong> Fill in your patient details below
+        </div>
+        <div class="step">
+            <strong>Step 2:</strong> Capture your face photo using the camera
+        </div>
+        <div class="step">
+            <strong>Step 3:</strong> Register to enable face login
+        </div>
+
+        <form id="registrationForm">
+            <div class="form-group">
+                <label for="name">Full Name *</label>
+                <input type="text" id="name" name="name" required>
+            </div>
+
+            <div class="form-group">
+                <label for="age">Age *</label>
+                <input type="number" id="age" name="age" required min="1" max="120">
+            </div>
+
+            <div class="form-group">
+                <label for="gender">Gender *</label>
+                <select id="gender" name="gender" required>
+                    <option value="">Select Gender</option>
+                    <option value="Male">Male</option>
+                    <option value="Female">Female</option>
+                    <option value="Other">Other</option>
+                </select>
+            </div>
+
+            <div class="form-group">
+                <label for="bloodGroup">Blood Group *</label>
+                <select id="bloodGroup" name="bloodGroup" required>
+                    <option value="">Select Blood Group</option>
+                    <option value="A+">A+</option>
+                    <option value="A-">A-</option>
+                    <option value="B+">B+</option>
+                    <option value="B-">B-</option>
+                    <option value="AB+">AB+</option>
+                    <option value="AB-">AB-</option>
+                    <option value="O+">O+</option>
+                    <option value="O-">O-</option>
+                </select>
+            </div>
+
+            <div class="form-group">
+                <label for="phone">Phone Number *</label>
+                <input type="tel" id="phone" name="phone" required placeholder="+1234567890">
+            </div>
+
+            <div class="form-group">
+                <label for="email">Email Address *</label>
+                <input type="email" id="email" name="email" required>
+            </div>
+
+            <div class="form-group">
+                <label for="address">Address</label>
+                <input type="text" id="address" name="address" placeholder="Your address">
+            </div>
+
+            <div class="form-group">
+                <label for="emergencyName">Emergency Contact Name</label>
+                <input type="text" id="emergencyName" name="emergencyName">
+            </div>
+
+            <div class="form-group">
+                <label for="emergencyPhone">Emergency Contact Phone</label>
+                <input type="tel" id="emergencyPhone" name="emergencyPhone">
+            </div>
+        </form>
+
+        <div class="camera-section">
+            <h3>📷 Capture Your Face Photo</h3>
+            <video id="video" autoplay muted></video>
+            <canvas id="canvas"></canvas>
+            <br>
+            <button onclick="startCamera()">🎥 Start Camera</button>
+            <button onclick="capturePhoto()" id="captureBtn" disabled>📸 Capture Photo</button>
+            <button onclick="stopCamera()">⏹️ Stop Camera</button>
+            <div id="capturedPhotoDiv"></div>
+        </div>
+
+        <div class="camera-section">
+            <button onclick="registerPatient()" id="registerBtn" disabled>✅ Register with Face</button>
+        </div>
+
+        <div id="successMsg" class="success"></div>
+        <div id="errorMsg" class="error"></div>
+    </div>
+
+    <script>
+        let video = document.getElementById('video');
+        let canvas = document.getElementById('canvas');
+        let capturedImageData = null;
+        let stream = null;
+
+        async function startCamera() {
+            try {
+                stream = await navigator.mediaDevices.getUserMedia({
+                    video: { width: 320, height: 240, facingMode: 'user' }
+                });
+                video.srcObject = stream;
+                document.getElementById('captureBtn').disabled = false;
+                showSuccess('Camera started! Position your face and click capture.');
+            } catch (error) {
+                showError('Camera access denied. Please allow camera access.');
+                console.error('Camera error:', error);
+            }
+        }
+
+        function capturePhoto() {
+            const context = canvas.getContext('2d');
+            canvas.width = video.videoWidth;
+            canvas.height = video.videoHeight;
+            context.drawImage(video, 0, 0);
+
+            capturedImageData = canvas.toDataURL('image/jpeg', 0.8);
+
+            // Show captured photo
+            const photoDiv = document.getElementById('capturedPhotoDiv');
+            photoDiv.innerHTML = `
+                <h4>✅ Photo Captured!</h4>
+                <img src="${capturedImageData}" class="captured-photo" alt="Captured face">
+            `;
+
+            document.getElementById('registerBtn').disabled = false;
+            showSuccess('Photo captured successfully! Now you can register.');
+        }
+
+        function stopCamera() {
+            if (stream) {
+                stream.getTracks().forEach(track => track.stop());
+                video.srcObject = null;
+                document.getElementById('captureBtn').disabled = true;
+            }
+        }
+
+        async function registerPatient() {
+            if (!capturedImageData) {
+                showError('Please capture your photo first!');
+                return;
+            }
+
+            // Get form data
+            const form = document.getElementById('registrationForm');
+            const formData = new FormData(form);
+
+            // Validate required fields
+            const requiredFields = ['name', 'age', 'gender', 'bloodGroup', 'phone', 'email'];
+            for (let field of requiredFields) {
+                if (!formData.get(field)) {
+                    showError(`Please fill in ${field.replace(/([A-Z])/g, ' $1').toLowerCase()}`);
+                    return;
+                }
+            }
+
+            // Prepare patient data
+            const patientData = {
+                Name: formData.get('name'),
+                Age: parseInt(formData.get('age')),
+                Gender: formData.get('gender'),
+                BloodGroup: formData.get('bloodGroup'),
+                PhoneNumber: formData.get('phone'),
+                Email: formData.get('email'),
+                Address: formData.get('address') || '',
+                EmergencyContactName: formData.get('emergencyName') || '',
+                EmergencyContactNumber: formData.get('emergencyPhone') || '',
+                Photo: capturedImageData, // Base64 image data
+                PresentDisease: '',
+                RecentSurgery: '',
+                DiabeticNonDiabetic: 'Non-Diabetic',
+                Allergies: '',
+                Others: ''
+            };
+
+            try {
+                document.getElementById('registerBtn').disabled = true;
+                document.getElementById('registerBtn').textContent = '⏳ Registering...';
+
+                const response = await fetch('http://localhost:5011/patient/register', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify(patientData)
+                });
+
+                const result = await response.json();
+
+                if (response.ok) {
+                    showSuccess(`
+                        🎉 Registration Successful! 
+                        <br><strong>Patient ID:</strong> ${result.result?.ID || 'Generated'}
+                        <br><strong>Name:</strong> ${patientData.Name}
+                        <br><br>✅ Your face has been registered! 
+                        <br>Now you can use face login at: 
+                        <br><a href="http://localhost:3000" target="_blank" style="color: white; text-decoration: underline;">http://localhost:3000</a>
+                        <br><br>Go to Patient Login → Face Recognition tab
+                    `);
+
+                    // Clear form and photo
+                    form.reset();
+                    document.getElementById('capturedPhotoDiv').innerHTML = '';
+                    stopCamera();
+
+                } else {
+                    showError(`Registration failed: ${result.msg || result.error || 'Unknown error'}`);
+                }
+            } catch (error) {
+                showError(`Network error: ${error.message}`);
+            } finally {
+                document.getElementById('registerBtn').disabled = false;
+                document.getElementById('registerBtn').textContent = '✅ Register with Face';
+            }
+        }
+
+        function showSuccess(message) {
+            const successDiv = document.getElementById('successMsg');
+            const errorDiv = document.getElementById('errorMsg');
+            successDiv.innerHTML = message;
+            successDiv.style.display = 'block';
+            errorDiv.style.display = 'none';
+            setTimeout(() => {
+                successDiv.style.display = 'none';
+            }, 10000);
+        }
+
+        function showError(message) {
+            const errorDiv = document.getElementById('errorMsg');
+            const successDiv = document.getElementById('successMsg');
+            errorDiv.innerHTML = message;
+            errorDiv.style.display = 'block';
+            successDiv.style.display = 'none';
+            setTimeout(() => {
+                errorDiv.style.display = 'none';
+            }, 8000);
+        }
+
+        // Auto-start camera when page loads
+        window.addEventListener('load', () => {
+            startCamera();
+        });
+    </script>
+</body>
+
+</html>
