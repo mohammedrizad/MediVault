@@ -16,3 +16,4 @@ BACKEND/create_ram_admin.js
 BACKEND/create_ram_admin_internal.js
 BACKEND/setup_med001.js
 BACKEND/create_admin.js
+.vscode/
