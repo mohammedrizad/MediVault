@@ -1,4 +1,5 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
+import { useAuth } from "../context/AuthContext";
 import {
   Box,
   Container,
@@ -43,21 +44,23 @@ import {
 } from "react-icons/fi";
 
 const HospitalSettings = () => {
+  const { currentUser } = useAuth();
+  const API_URL = process.env.REACT_APP_API_URL || "http://localhost:5002";
+
   const [hospitalData, setHospitalData] = useState({
-    name: "MediVault General Hospital",
-    address: "123 Healthcare Avenue, Medical District, City 12345",
-    phone: "+1 (555) 123-4567",
-    email: "info@medivault-hospital.com",
-    website: "www.medivault-hospital.com",
-    license: "HOS-2024-001234",
-    established: "1985",
-    description:
-      "A leading healthcare institution providing comprehensive medical services with state-of-the-art facilities and experienced medical professionals.",
-    logo: "https://placehold.co/150x150/2563eb/ffffff?text=MV",
+    name: "",
+    address: "",
+    phone: "",
+    email: "",
+    timings: "",
+    closedOn: "",
+    specialties: "",
+    numberOfBeds: "",
+    logo: "",
   });
 
   const [adminData, setAdminData] = useState({
-    email: "admin@medivault-hospital.com",
+    email: "",
     currentPassword: "",
     newPassword: "",
     confirmPassword: "",
@@ -74,6 +77,37 @@ const HospitalSettings = () => {
   const toast = useToast();
   const cardBg = useColorModeValue("white", "gray.700");
 
+  useEffect(() => {
+    const loadProfile = async () => {
+      if (!currentUser?.id) return;
+      try {
+        const authToken = localStorage.getItem("authToken");
+        const res = await fetch(`${API_URL}/admin/profile/${currentUser.id}`, {
+          headers: authToken ? { Authorization: `Bearer ${authToken}` } : {},
+        });
+        const json = await res.json();
+        if (json.admin) {
+          setHospitalData({
+            name: json.admin.hospitalName || "",
+            address: json.admin.address || "",
+            phone: json.admin.phone || "",
+            email: json.admin.email || "",
+            timings: json.admin.timings || "",
+            closedOn: json.admin.closedOn || "",
+            specialties: json.admin.specialties || "",
+            numberOfBeds: json.admin.numberOfBeds || "",
+            logo: json.admin.logo || "",
+          });
+          setAdminData((prev) => ({ ...prev, email: json.admin.email || "" }));
+        }
+      } catch (err) {
+        console.error("Failed to load hospital profile:", err);
+      }
+    };
+    loadProfile();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [currentUser?.id]);
+
   const handleHospitalChange = (e) => {
     const { name, value } = e.target;
     setHospitalData({ ...hospitalData, [name]: value });
@@ -84,18 +118,51 @@ const HospitalSettings = () => {
     setAdminData({ ...adminData, [name]: value });
   };
 
-  const handleSaveHospitalInfo = () => {
-    toast({
-      title: "Hospital information updated",
-      description: "Hospital details have been saved successfully.",
-      status: "success",
-      duration: 3000,
-      isClosable: true,
-    });
-    setIsEditing(false);
+  const handleSaveHospitalInfo = async () => {
+    try {
+      const authToken = localStorage.getItem("authToken");
+      const res = await fetch(`${API_URL}/admin/update/${currentUser.id}`, {
+        method: "PUT",
+        headers: {
+          "Content-Type": "application/json",
+          ...(authToken ? { Authorization: `Bearer ${authToken}` } : {}),
+        },
+        body: JSON.stringify({
+          hospitalName: hospitalData.name,
+          address: hospitalData.address,
+          phone: hospitalData.phone,
+          timings: hospitalData.timings,
+          closedOn: hospitalData.closedOn,
+          specialties: hospitalData.specialties,
+          numberOfBeds: hospitalData.numberOfBeds,
+          logo: hospitalData.logo,
+        }),
+      });
+      const data = await res.json();
+      if (data.msg === "Hospital profile updated successfully") {
+        toast({
+          title: "Hospital information updated",
+          description: "Hospital details have been saved successfully.",
+          status: "success",
+          duration: 3000,
+          isClosable: true,
+        });
+        setIsEditing(false);
+      } else {
+        throw new Error(data.msg || "Failed to update hospital profile");
+      }
+    } catch (err) {
+      toast({
+        title: "Failed to save",
+        description: err.message,
+        status: "error",
+        duration: 3000,
+        isClosable: true,
+      });
+    }
   };
 
-  const handleChangePassword = () => {
+  const handleChangePassword = async () => {
     if (adminData.newPassword !== adminData.confirmPassword) {
       toast({
         title: "Password mismatch",
@@ -118,21 +185,44 @@ const HospitalSettings = () => {
       return;
     }
 
-    toast({
-      title: "Password updated",
-      description: "Admin password has been changed successfully.",
-      status: "success",
-      duration: 3000,
-      isClosable: true,
-    });
-
-    setAdminData({
-      ...adminData,
-      currentPassword: "",
-      newPassword: "",
-      confirmPassword: "",
-    });
-    onClose();
+    try {
+      const res = await fetch(`${API_URL}/admin/passwordchange`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          id: currentUser.id,
+          oldPassword: adminData.currentPassword,
+          newPassword: adminData.newPassword,
+        }),
+      });
+      const data = await res.json();
+      if (data.msg === "PasswordChanged") {
+        toast({
+          title: "Password updated",
+          description: "Admin password has been changed successfully.",
+          status: "success",
+          duration: 3000,
+          isClosable: true,
+        });
+        setAdminData({
+          ...adminData,
+          currentPassword: "",
+          newPassword: "",
+          confirmPassword: "",
+        });
+        onClose();
+      } else {
+        throw new Error(data.msg || "Failed to change password");
+      }
+    } catch (err) {
+      toast({
+        title: "Failed to change password",
+        description: err.message,
+        status: "error",
+        duration: 3000,
+        isClosable: true,
+      });
+    }
   };
 
   const handleLogoUpload = (e) => {
@@ -313,10 +403,10 @@ const HospitalSettings = () => {
 
                     <SimpleGrid columns={2} spacing={4}>
                       <FormControl>
-                        <FormLabel>Website</FormLabel>
+                        <FormLabel>Timings</FormLabel>
                         <Input
-                          name="website"
-                          value={hospitalData.website}
+                          name="timings"
+                          value={hospitalData.timings}
                           onChange={handleHospitalChange}
                           isReadOnly={!isEditing}
                           bg={isEditing ? "white" : "gray.50"}
@@ -324,10 +414,24 @@ const HospitalSettings = () => {
                       </FormControl>
 
                       <FormControl>
-                        <FormLabel>License Number</FormLabel>
+                        <FormLabel>Closed On</FormLabel>
                         <Input
-                          name="license"
-                          value={hospitalData.license}
+                          name="closedOn"
+                          value={hospitalData.closedOn}
+                          onChange={handleHospitalChange}
+                          isReadOnly={!isEditing}
+                          bg={isEditing ? "white" : "gray.50"}
+                        />
+                      </FormControl>
+                    </SimpleGrid>
+
+                    <SimpleGrid columns={2} spacing={4}>
+                      <FormControl>
+                        <FormLabel>Number of Beds</FormLabel>
+                        <Input
+                          name="numberOfBeds"
+                          type="number"
+                          value={hospitalData.numberOfBeds}
                           onChange={handleHospitalChange}
                           isReadOnly={!isEditing}
                           bg={isEditing ? "white" : "gray.50"}
@@ -336,25 +440,14 @@ const HospitalSettings = () => {
                     </SimpleGrid>
 
                     <FormControl>
-                      <FormLabel>Established Year</FormLabel>
-                      <Input
-                        name="established"
-                        value={hospitalData.established}
-                        onChange={handleHospitalChange}
-                        isReadOnly={!isEditing}
-                        bg={isEditing ? "white" : "gray.50"}
-                      />
-                    </FormControl>
-
-                    <FormControl>
-                      <FormLabel>Description</FormLabel>
+                      <FormLabel>Specialties</FormLabel>
                       <Textarea
-                        name="description"
-                        value={hospitalData.description}
+                        name="specialties"
+                        value={hospitalData.specialties}
                         onChange={handleHospitalChange}
                         isReadOnly={!isEditing}
                         bg={isEditing ? "white" : "gray.50"}
-                        rows={4}
+                        rows={3}
                       />
                     </FormControl>
                   </SimpleGrid>

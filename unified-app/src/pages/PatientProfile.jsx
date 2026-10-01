@@ -55,15 +55,15 @@ const PatientProfile = () => {
   const [profile, setProfile] = useState({});
   const [editedProfile, setEditedProfile] = useState({});
   const [loading, setLoading] = useState(true);
+  const [patientMongoId, setPatientMongoId] = useState(null);
 
   const cardBg = useColorModeValue("white", "gray.700");
   const borderColor = useColorModeValue("gray.200", "gray.600");
+  const API_URL = process.env.REACT_APP_API_URL || "http://localhost:5002";
 
   useEffect(() => {
-    // Load patient data from localStorage or use default
     const savedPatientData = localStorage.getItem("patientData");
     let patientData = {};
-
     if (savedPatientData) {
       try {
         patientData = JSON.parse(savedPatientData);
@@ -72,70 +72,121 @@ const PatientProfile = () => {
       }
     }
 
-    // Set default profile data
-    const defaultProfile = {
-      name: patientData.name || "John Doe",
-      email: patientData.email || "john.doe@email.com",
-      phone: patientData.phone || "+1-234-567-8900",
-      address: patientData.address || "123 Main St, City, State 12345",
-      dateOfBirth: "1990-01-01",
-      gender: "Male",
-      bloodType: "O+",
-      height: "5'10\"",
-      weight: "150 lbs",
+    const medicalId = patientData.MedicalId || patientData.medicalId;
+
+    const buildProfile = (p) => ({
+      name: p.Name || "",
+      email: p.Email || "",
+      phone: p.Mobile_no || "",
+      address: p.Address || "",
+      dateOfBirth: p.DOB || "",
+      gender: p.Gender || "",
+      bloodType: p.BloodGroup || "",
+      height: "",
+      weight: "",
       emergencyContact: {
-        name: "Jane Doe",
-        phone: "+1-234-567-8901",
-        relationship: "Spouse",
+        name: p.EmergencyContactName || "",
+        phone: p.EmergencyContactNumber || "",
+        relationship: "",
       },
-      insurance: {
-        provider: "Health Insurance Co.",
-        policyNumber: "POL123456789",
-        groupNumber: "GRP456",
-      },
-      allergies: ["Penicillin", "Nuts"],
-      medications: ["Vitamin D", "Multivitamin"],
-      conditions: ["Hypertension"],
-      preferences: {
-        notifications: true,
-        emailUpdates: true,
-        smsReminders: false,
-      },
-    };
-
-    setProfile(defaultProfile);
-    setEditedProfile(defaultProfile);
-    setLoading(false);
-  }, []);
-
-  const handleSaveProfile = () => {
-    setProfile(editedProfile);
-    setIsEditing(false);
-
-    // Update localStorage if patient data exists
-    const savedPatientData = localStorage.getItem("patientData");
-    if (savedPatientData) {
-      try {
-        const patientData = JSON.parse(savedPatientData);
-        const updatedData = {
-          ...patientData,
-          name: editedProfile.name,
-          email: editedProfile.email,
-          phone: editedProfile.phone,
-          address: editedProfile.address,
-        };
-        localStorage.setItem("patientData", JSON.stringify(updatedData));
-      } catch (error) {
-        console.error("Error updating patient data:", error);
-      }
-    }
-
-    toast({
-      title: "Profile Updated!",
-      description: "Your profile information has been saved successfully.",
-      status: "success",
-      duration: 3000,
+      insurance: { provider: "", policyNumber: "", groupNumber: "" },
+      allergies:
+        p.Allergies && p.Allergies !== "None" ? p.Allergies.split(",").map((a) => a.trim()) : [],
+      medications: [],
+      conditions:
+        p.ChronicConditions && p.ChronicConditions !== "None"
+          ? p.ChronicConditions.split(",").map((c) => c.trim())
+          : [],
+      preferences: { notifications: true, emailUpdates: true, smsReminders: false },
     });
+
+    const loadFromBackend = async () => {
+      if (!medicalId) {
+        setLoading(false);
+        return;
+      }
+      try {
+        const res = await fetch(`${API_URL}/patient/search/${medicalId}`);
+        const json = await res.json();
+        if (json.data) {
+          setPatientMongoId(json.data._id);
+          const built = buildProfile(json.data);
+          setProfile(built);
+          setEditedProfile(built);
+        }
+      } catch (err) {
+        console.error("Failed to load patient profile:", err);
+      } finally {
+        setLoading(false);
+      }
+    };
+    loadFromBackend();
+  }, [API_URL]);
+
+  const handleSaveProfile = async () => {
+    if (!patientMongoId) {
+      setProfile(editedProfile);
+      setIsEditing(false);
+      return;
+    }
+    try {
+      const res = await fetch(`${API_URL}/patient/update/${patientMongoId}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          Name: editedProfile.name,
+          Email: editedProfile.email,
+          Mobile_no: editedProfile.phone,
+          Address: editedProfile.address,
+          DOB: editedProfile.dateOfBirth,
+          Gender: editedProfile.gender,
+          BloodGroup: editedProfile.bloodType,
+          Allergies: editedProfile.allergies.length ? editedProfile.allergies.join(", ") : "None",
+          EmergencyContactName: editedProfile.emergencyContact.name,
+          EmergencyContactNumber: editedProfile.emergencyContact.phone,
+        }),
+      });
+      const data = await res.json();
+      if (data.msg === "Patient updated successfully") {
+        setProfile(editedProfile);
+        setIsEditing(false);
+
+        const savedPatientData = localStorage.getItem("patientData");
+        if (savedPatientData) {
+          try {
+            const patientData = JSON.parse(savedPatientData);
+            localStorage.setItem(
+              "patientData",
+              JSON.stringify({
+                ...patientData,
+                name: editedProfile.name,
+                email: editedProfile.email,
+                phone: editedProfile.phone,
+                address: editedProfile.address,
+              }),
+            );
+          } catch (error) {
+            console.error("Error updating cached patient data:", error);
+          }
+        }
+
+        toast({
+          title: "Profile Updated!",
+          description: "Your profile information has been saved successfully.",
+          status: "success",
+          duration: 3000,
+        });
+      } else {
+        throw new Error(data.msg || "Failed to update profile");
+      }
+    } catch (err) {
+      toast({
+        title: "Failed to save profile",
+        description: err.message,
+        status: "error",
+        duration: 3000,
+      });
+    }
   };
 
   const handleCancelEdit = () => {

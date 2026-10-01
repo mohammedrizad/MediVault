@@ -188,6 +188,66 @@ route.post("/getcount", Middleware, async (req, res) => {
   }
 });
 
+// -------------------- GET HOSPITAL/ADMIN PROFILE --------------------
+route.get("/profile/:id", verifyToken, authorize("admin"), async (req, res) => {
+  try {
+    const { id } = req.params;
+    if (req.user.id !== id) {
+      return res
+        .status(403)
+        .json({ msg: "You can only view your own hospital profile" });
+    }
+    const admin = await AdminScheme.findById(id).select("-password");
+    if (!admin) {
+      return res.status(404).json({ msg: "Hospital not found" });
+    }
+    res.json({ msg: "Profile retrieved successfully", admin });
+  } catch (err) {
+    console.error("Get hospital profile error:", err);
+    res.status(500).json({ msg: "Error occurred while fetching hospital profile" });
+  }
+});
+
+// -------------------- UPDATE HOSPITAL/ADMIN PROFILE --------------------
+route.put("/update/:id", verifyToken, authorize("admin"), async (req, res) => {
+  try {
+    const { id } = req.params;
+    if (req.user.id !== id) {
+      return res
+        .status(403)
+        .json({ msg: "You can only update your own hospital profile" });
+    }
+    const allowedFields = [
+      "hospitalName",
+      "ownerName",
+      "address",
+      "phone",
+      "timings",
+      "closedOn",
+      "logo",
+      "specialties",
+      "numberOfBeds",
+    ];
+    const updates = {};
+    for (const field of allowedFields) {
+      if (req.body[field] !== undefined) updates[field] = req.body[field];
+    }
+
+    const updatedAdmin = await AdminScheme.findByIdAndUpdate(id, updates, {
+      new: true,
+    });
+
+    if (!updatedAdmin) {
+      return res.status(404).json({ msg: "Hospital not found" });
+    }
+
+    res.json({ msg: "Hospital profile updated successfully", admin: updatedAdmin });
+  } catch (err) {
+    console.error("Update hospital profile error:", err);
+    res.status(500).json({ msg: "Error occurred while updating hospital profile" });
+  }
+});
+
 // -------------------- PASSWORD CHANGE --------------------
 route.post("/passwordchange", async (req, res) => {
   try {

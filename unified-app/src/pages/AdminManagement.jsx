@@ -257,7 +257,7 @@ const AdminManagement = () => {
       }
 
       let endpoint = "";
-      let payload = { ...formData, Admin: currentUser?.ID };
+      let payload = { ...formData, Admin: currentUser?.id };
 
       switch (activeTab) {
         case "doctor":
@@ -292,10 +292,12 @@ const AdminManagement = () => {
           throw new Error("Invalid tab");
       }
 
+      const authToken = localStorage.getItem("authToken");
       const response = await fetch(`http://localhost:5002${endpoint}`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
+          ...(authToken ? { Authorization: `Bearer ${authToken}` } : {}),
         },
         body: JSON.stringify(payload),
       });
@@ -361,10 +363,12 @@ const AdminManagement = () => {
           throw new Error("Invalid type");
       }
 
+      const authToken = localStorage.getItem("authToken");
       const response = await fetch(`http://localhost:5002${endpoint}`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
+          ...(authToken ? { Authorization: `Bearer ${authToken}` } : {}),
         },
         body: JSON.stringify(payload),
       });

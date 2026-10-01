@@ -1,4 +1,5 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
+import { useAuth } from "../context/AuthContext";
 import {
   Box,
   VStack,
@@ -99,11 +100,36 @@ const ScanCenterSettings = () => {
 
   const cardBg = useColorModeValue("white", "gray.700");
   const borderColor = useColorModeValue("gray.200", "gray.600");
+  const { currentUser } = useAuth();
+  const API_URL = process.env.REACT_APP_API_URL || "http://localhost:5002";
 
   // Settings state
   const [generalSettings, setGeneralSettings] = useState({
     ...defaultGeneralSettings,
   });
+
+  useEffect(() => {
+    const loadProfile = async () => {
+      if (!currentUser?.id) return;
+      try {
+        const res = await fetch(`${API_URL}/scan/getall`);
+        const data = await res.json();
+        const record = (data.result || []).find((r) => r._id === currentUser.id);
+        if (record) {
+          setGeneralSettings((prev) => ({
+            ...prev,
+            centerName: record.username || prev.centerName,
+            address: record.Current_Address || prev.address,
+            email: record.Email_Address || prev.email,
+          }));
+        }
+      } catch (err) {
+        console.error("Failed to load scan center profile:", err);
+      }
+    };
+    loadProfile();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [currentUser?.id]);
 
   const [notificationSettings, setNotificationSettings] = useState({
     ...defaultNotificationSettings,
@@ -149,10 +175,35 @@ const ScanCenterSettings = () => {
 
   const handleSaveSettings = async () => {
     setIsLoading(true);
-    // Simulate API call
-    await new Promise((resolve) => setTimeout(resolve, 2000));
-    setIsLoading(false);
-    onOpen();
+    try {
+      const authToken = localStorage.getItem("authToken");
+      const res = await fetch(`${API_URL}/scan/update/${currentUser.id}`, {
+        method: "PUT",
+        headers: {
+          "Content-Type": "application/json",
+          ...(authToken ? { Authorization: `Bearer ${authToken}` } : {}),
+        },
+        body: JSON.stringify({
+          username: generalSettings.centerName,
+          Current_Address: generalSettings.address,
+          Email_Address: generalSettings.email,
+        }),
+      });
+      const data = await res.json();
+      if (data.msg !== "Scan center updated successfully") {
+        throw new Error(data.msg || "Failed to save settings");
+      }
+      onOpen();
+    } catch (err) {
+      toast({
+        title: "Failed to save settings",
+        description: err.message,
+        status: "error",
+        duration: 3000,
+      });
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   const getStatusColor = (status) => {
