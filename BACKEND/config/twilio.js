@@ -5,14 +5,13 @@ module.exports = {
   // Your Twilio Account SID
   accountSid: process.env.TWILIO_ACCOUNT_SID,
 
-  // ✅ CONFIGURED: Your Twilio Auth Token
   authToken: process.env.TWILIO_AUTH_TOKEN,
 
   // Your Twilio Verify Service SID
   serviceSid: process.env.TWILIO_VERIFY_SERVICE_SID,
 
   // Your Twilio Phone Number (for fallback SMS method)
-  twilioPhoneNumber: "+1234567890", // Replace with your actual Twilio number
+  twilioPhoneNumber: process.env.TWILIO_PHONE_NUMBER,
 
   // OTP Configuration
   otpLength: 6,
