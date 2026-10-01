@@ -4,7 +4,7 @@
 
 MediVault is a healthcare management platform designed to improve the accessibility, security, and management of electronic health records (EHRs) across connected healthcare facilities. It aims to bridge the gap between Primary Health Centres (PHCs) and hospitals by providing identity-based patient authentication, secure medical record storage, and cross-hospital record access.
 
-The platform combines facial recognition, OTP verification, role-based access control, and cloud-based medical record management to support secure access to patient histories. Separate dashboards for patients, doctors, nurses, administrators, and scan centres provide role-specific functionalities for healthcare operations.
+The platform combines facial recognition, OTP verification, role-based access control, and encrypted cloud-based medical record management to support secure access to patient histories. Separate dashboards for patients, doctors, nurses, administrators, and scan centres provide role-specific functionalities, with the broader goal of strengthening identity verification and enabling continuity of care across connected facilities.
 
 Key highlights include:
 
@@ -53,82 +53,13 @@ Key highlights include:
 * **Drug Interaction Checker** – Helps identify potential interactions between medications.
 * **Intelligent Medical Record Search** – Helps users locate relevant medical information.
 
-## Key Features
+## Portals
 
-### 1. Facial Biometric Authentication
-
-Provides face-based patient verification to simplify identity validation and reduce dependence on conventional login credentials.
-
-### 2. OTP-Based Alternative Verification
-
-Offers OTP verification as an alternative patient authentication method when facial recognition is unavailable or unsuccessful.
-
-### 3. Cross-Hospital Medical Record Access
-
-Enables authorized healthcare professionals at connected facilities to retrieve patient medical histories, supporting continuity of care across PHCs and hospitals.
-
-### 4. Patient Registration and Record Management
-
-Supports patient registration and the management of medical information, allowing patient records to be maintained digitally.
-
-### 5. Medical Report Upload and Encrypted Cloud Storage
-
-Allows medical reports and supporting documents to be uploaded and stored using cloud-based media storage. Each file is AES-256-CBC encrypted and SHA-256 hashed before upload, with integrity verified on retrieval, making them securely accessible to authorized users only.
-
-### 6. Role-Based Healthcare Dashboards
-
-Provides dedicated portals for patients, doctors, nurses, administrators, and scan centres, with functionalities tailored to their respective roles.
-
-### 7. Patient Dashboard
-
-Allows patients to access their healthcare information, visit history, appointments, and available health-monitoring features.
-
-### 8. Doctor Dashboard
-
-Enables doctors to manage patient information, access medical records, review appointments, and use healthcare assistance tools.
-
-### 9. Appointment and Medication Management
-
-Supports scheduling, updating, and tracking patient appointments and prescribed medications across the doctor, nurse, patient, and scan centre portals.
-
-### 10. Clinical Early-Warning Scoring and Alerts
-
-Calculates a vitals-based early-warning score to flag at-risk patients, and automatically generates critical alerts for abnormal readings or significant clinical events.
-
-### 11. Administrative Management
-
-Provides administrative facilities for managing users, healthcare personnel, patients, scan centres, hospital settings, and system access.
-
-### 12. Audit and Access Monitoring
-
-Provides administrative audit facilities to support monitoring and accountability for healthcare system operations.
-
-### 13. AI-Assisted Medical Report Summarization
-
-Helps present important medical information in a concise and understandable format for easier review.
-
-### 14. Medical Image Analysis
-
-Provides an AI-assisted facility for analysing medical images to support healthcare information review.
-
-### 15. Drug Interaction Checking
-
-Offers a tool for checking potential interactions between medications, supporting safer medication review.
-
-### 16. Intelligent Medical Record Search
-
-Helps healthcare users find relevant patient information and medical records through search functionality.
-
-## Project Objectives
-
-* Digitize patient health records and reduce dependence on fragmented paper-based documentation.
-* Enable secure access to patient medical histories across connected healthcare facilities.
-* Improve patient identification through facial biometrics and alternative OTP verification.
-* Protect sensitive health information through role-based access control and end-to-end encryption.
-* Simplify medical report storage, retrieval, and management.
-* Support continuity of care between rural PHCs and larger hospitals.
-* Assist healthcare professionals with AI-based medical information tools.
-* Provide a unified platform for patients and healthcare providers.
+* **Patient** – Visit history, appointments, health monitoring, access manager/timeline, AI report simplifier.
+* **Doctor** – Patient search, medical records, consultations, prescriptions, appointments, AI image analysis, early-warning score, alerts.
+* **Nurse** – Patient care, health records, medication administration, appointments.
+* **Admin** – User/hospital management, cross-hospital access console, system audit log, analytics.
+* **Scan Centre** – Scan scheduling, equipment tracking, result upload, reports.
 
 ## System Workflow
 
@@ -196,7 +127,3 @@ node seed_appointments_medications.js
 * Multilingual patient interfaces and medical reports.
 * Further enhancements to AI-assisted healthcare tools.
 * Expansion to support additional PHCs, hospitals, and healthcare networks.
-
-## Project Goals
-
-MediVault aims to provide a secure, accessible, and patient-centric digital healthcare platform that improves medical record availability, strengthens identity verification, and supports collaboration between healthcare facilities. By combining biometric authentication, encrypted cloud-based record management, and AI-assisted healthcare functionalities, the project seeks to contribute to more connected and efficient healthcare delivery.
