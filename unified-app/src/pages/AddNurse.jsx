@@ -77,15 +77,19 @@ const AddNurse = () => {
 
     setIsLoading(true);
     try {
-      const adminData = JSON.parse(localStorage.getItem("user") || "{}");
+      const adminData = JSON.parse(localStorage.getItem("userData") || "{}");
+      const authToken = localStorage.getItem("authToken");
 
       const response = await fetch(
         `${API_BASE_URL}/admin/postbyadminfornurse`,
         {
           method: "POST",
-          headers: { "Content-Type": "application/json" },
+          headers: {
+            "Content-Type": "application/json",
+            ...(authToken ? { Authorization: `Bearer ${authToken}` } : {}),
+          },
           body: JSON.stringify({
-            Admin: adminData.email || "admin@test.com",
+            Admin: adminData.id,
             Doctor_name: formData.nurseName,
             Email_Address: formData.email,
             PhoneNo: formData.phone,
@@ -104,6 +108,7 @@ const AddNurse = () => {
       const data = await response.json();
 
       if (
+        data.msg === "Details are saved successfully" ||
         data.msg === "Nurse has been added" ||
         data.msg === "Added successfully" ||
         data.result
