@@ -3,6 +3,7 @@ const route = express.Router();
 const PatientSchemas = require("../Models/PatientsSchema");
 const DoctorSchema = require("../Models/DoctorScheme");
 const AdminSchema = require("../Models/AdminSchema");
+const ScanCenterSchema = require("../Models/ScanCenter");
 const currentDate = new Date();
 const day = String(currentDate.getDate()).padStart(2, "0");
 const month = String(currentDate.getMonth() + 1).padStart(2, "0");
@@ -611,6 +612,105 @@ route.post(
     }
   },
 );
+// Scan Center: submit a completed scan result for a patient. Unlike
+// /updatereport (which only edits an existing *same-day* History entry
+// created by a doctor), this creates a new History entry outright, so a
+// scan centre can record results independently of any doctor visit.
+route.post(
+  "/scanresult",
+  verifyToken,
+  authorize("scan_center", "admin"),
+  async (req, res) => {
+    try {
+      const { patientId, scanType, findings, files } = req.body;
+      if (!patientId || !scanType) {
+        return res
+          .status(400)
+          .json({ msg: "patientId and scanType are required" });
+      }
+
+      const query = /^[0-9a-fA-F]{24}$/.test(patientId)
+        ? { $or: [{ MedicalId: patientId }, { _id: patientId }] }
+        : { MedicalId: patientId };
+      const patient = await PatientSchemas.findOne(query);
+      if (!patient) {
+        return res.status(404).json({ msg: "Patient not found" });
+      }
+
+      let scanCenterName = req.user.email || "Scan Center";
+      if (req.user.role === "scan_center") {
+        const scanCenter = await ScanCenterSchema.findById(req.user.id);
+        if (scanCenter?.username) scanCenterName = scanCenter.username;
+      }
+
+      patient.History.push({
+        disease: scanType,
+        notes: findings || "",
+        vitals: {},
+        Date: simpleFormattedDate,
+        DoctorDetails: { name: scanCenterName, role: "scan_center" },
+        report: { files: files || [] },
+        preciption: [],
+      });
+      await patient.save();
+
+      res.json({
+        msg: "Scan result added successfully",
+        patient: {
+          id: patient._id,
+          medicalId: patient.MedicalId,
+          name: patient.Name,
+        },
+      });
+    } catch (err) {
+      console.error("Add scan result error:", err);
+      res.status(500).json({ msg: "Error occurred while adding scan result" });
+    }
+  },
+);
+
+// Scan Center: list scan results this centre has submitted, by scanning
+// all patients' History for entries this centre authored.
+route.get(
+  "/scanresults/:scanCenterName",
+  verifyToken,
+  authorize("scan_center", "admin"),
+  async (req, res) => {
+    try {
+      const { scanCenterName } = req.params;
+      const patients = await PatientSchemas.find({
+        "History.DoctorDetails.role": "scan_center",
+      });
+
+      const results = [];
+      patients.forEach((p) => {
+        (p.History || []).forEach((h) => {
+          if (
+            h.DoctorDetails?.role === "scan_center" &&
+            h.DoctorDetails?.name === scanCenterName
+          ) {
+            results.push({
+              id: h._id,
+              patientId: p.MedicalId,
+              patientName: p.Name,
+              scanType: h.disease,
+              findings: h.notes,
+              uploadDate: h.Date,
+              filesCount: h.report?.files?.length || 0,
+              files: h.report?.files || [],
+            });
+          }
+        });
+      });
+
+      res.json({ msg: "Scan results retrieved", results });
+    } catch (err) {
+      console.error("Get scan results error:", err);
+      res.status(500).json({ msg: "Error occurred while fetching scan results" });
+    }
+  },
+);
+
 route.post(
   "/updatereport",
   verifyToken,

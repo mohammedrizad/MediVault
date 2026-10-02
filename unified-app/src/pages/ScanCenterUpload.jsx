@@ -1,4 +1,5 @@
-import React, { useState, useRef } from "react";
+import React, { useState, useRef, useEffect } from "react";
+import { useAuth } from "../context/AuthContext";
 import {
   Box,
   VStack,
@@ -57,11 +58,15 @@ import {
 } from "react-icons/fi";
 
 const ScanCenterUpload = () => {
+  const { currentUser } = useAuth();
+  const API_URL = process.env.REACT_APP_API_URL || "http://localhost:5002";
   const [uploadProgress, setUploadProgress] = useState(0);
+  const [isUploading, setIsUploading] = useState(false);
   const [selectedFiles, setSelectedFiles] = useState([]);
   const [patientId, setPatientId] = useState("");
   const [scanType, setScanType] = useState("");
   const [findings, setFindings] = useState("");
+  const [uploadedResults, setUploadedResults] = useState([]);
   const fileInputRef = useRef(null);
   const { isOpen, onOpen, onClose } = useDisclosure();
   const toast = useToast();
@@ -69,78 +74,42 @@ const ScanCenterUpload = () => {
   const cardBg = useColorModeValue("white", "gray.700");
   const borderColor = useColorModeValue("gray.200", "gray.600");
 
-  // Sample uploaded results data
-  const uploadedResults = [
-    {
-      id: 1,
-      patientName: "Sarah Johnson",
-      patientId: "P001",
-      scanType: "MRI Brain",
-      uploadDate: "2025-11-08",
-      uploadTime: "02:30 PM",
-      status: "Completed",
-      technician: "Dr. Smith",
-      filesCount: 15,
-      fileSize: "45.2 MB",
-      findings: "Normal brain structure with no abnormalities detected",
-      priority: "Urgent",
-      referringDoctor: "Dr. Wilson",
-      reportSent: true,
-    },
-    {
-      id: 2,
-      patientName: "Michael Brown",
-      patientId: "P002",
-      scanType: "CT Chest",
-      uploadDate: "2025-11-08",
-      uploadTime: "01:15 PM",
-      status: "Pending Review",
-      technician: "Dr. Davis",
-      filesCount: 8,
-      fileSize: "23.7 MB",
-      findings: "Awaiting radiologist review",
-      priority: "Standard",
-      referringDoctor: "Dr. Lee",
-      reportSent: false,
-    },
-    {
-      id: 3,
-      patientName: "Emily Wilson",
-      patientId: "P003",
-      scanType: "X-Ray Chest",
-      uploadDate: "2025-11-08",
-      uploadTime: "12:45 PM",
-      status: "Completed",
-      technician: "Tech Johnson",
-      filesCount: 3,
-      fileSize: "5.8 MB",
-      findings: "Clear chest X-ray, no acute findings",
-      priority: "Standard",
-      referringDoctor: "Dr. Brown",
-      reportSent: true,
-    },
-    {
-      id: 4,
-      patientName: "David Lee",
-      patientId: "P004",
-      scanType: "Ultrasound Abdomen",
-      uploadDate: "2025-11-08",
-      uploadTime: "11:30 AM",
-      status: "In Progress",
-      technician: "Dr. Garcia",
-      filesCount: 12,
-      fileSize: "18.3 MB",
-      findings: "Processing images...",
-      priority: "High",
-      referringDoctor: "Dr. Martinez",
-      reportSent: false,
-    },
-  ];
+  const loadResults = async () => {
+    if (!currentUser?.name) return;
+    try {
+      const authToken = localStorage.getItem("authToken");
+      const res = await fetch(
+        `${API_URL}/patient/scanresults/${encodeURIComponent(currentUser.name)}`,
+        { headers: authToken ? { Authorization: `Bearer ${authToken}` } : {} },
+      );
+      const data = await res.json();
+      setUploadedResults(
+        (data.results || []).map((r) => ({
+          id: r.id,
+          patientName: r.patientName,
+          patientId: r.patientId,
+          scanType: r.scanType,
+          uploadDate: r.uploadDate,
+          status: "Completed",
+          technician: currentUser.name,
+          filesCount: r.filesCount,
+          findings: r.findings || "No findings recorded",
+        })),
+      );
+    } catch (err) {
+      console.error("Failed to load scan results:", err);
+    }
+  };
+
+  useEffect(() => {
+    loadResults();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [currentUser?.name]);
 
   // Upload statistics
   const uploadStats = [
     {
-      label: "Today's Uploads",
+      label: "Total Uploads",
       value: uploadedResults.length,
       color: "blue.500",
     },
@@ -156,8 +125,8 @@ const ScanCenterUpload = () => {
       color: "orange.500",
     },
     {
-      label: "Total Size",
-      value: "93.0 MB",
+      label: "Files Attached",
+      value: uploadedResults.reduce((sum, r) => sum + (r.filesCount || 0), 0),
       color: "purple.500",
     },
   ];
@@ -197,18 +166,87 @@ const ScanCenterUpload = () => {
     setSelectedFiles(files);
   };
 
-  const handleUpload = () => {
-    // Simulate upload progress
-    setUploadProgress(0);
-    const interval = setInterval(() => {
-      setUploadProgress((prev) => {
-        if (prev >= 100) {
-          clearInterval(interval);
-          return 100;
-        }
-        return prev + 10;
+  const handleUpload = async () => {
+    if (!patientId || !scanType) {
+      toast({
+        title: "Missing fields",
+        description: "Please enter a patient ID and select a scan type.",
+        status: "warning",
+        duration: 3000,
       });
-    }, 200);
+      return;
+    }
+
+    setIsUploading(true);
+    setUploadProgress(0);
+    try {
+      const authToken = localStorage.getItem("authToken");
+      const authHeader = authToken ? { Authorization: `Bearer ${authToken}` } : {};
+      const uploadedFiles = [];
+
+      for (let i = 0; i < selectedFiles.length; i++) {
+        const file = selectedFiles[i];
+        const formData = new FormData();
+        formData.append("file", file);
+
+        const res = await fetch(`${API_URL}/records/upload`, {
+          method: "POST",
+          headers: authHeader,
+          body: formData,
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.msg || `Failed to upload ${file.name}`);
+
+        uploadedFiles.push({
+          name: data.originalName,
+          url: data.url,
+          uploadDate: new Date().toISOString(),
+          fileHash: data.fileHash,
+          encryptionIV: data.encryptionIV,
+          encrypted: true,
+        });
+        setUploadProgress(Math.round(((i + 1) / Math.max(selectedFiles.length, 1)) * 90));
+      }
+
+      const resultRes = await fetch(`${API_URL}/patient/scanresult`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", ...authHeader },
+        body: JSON.stringify({
+          patientId,
+          scanType,
+          findings,
+          files: uploadedFiles,
+        }),
+      });
+      const resultData = await resultRes.json();
+      if (!resultRes.ok) {
+        throw new Error(resultData.msg || "Failed to attach scan result to patient");
+      }
+
+      setUploadProgress(100);
+      toast({
+        title: "Scan Results Uploaded",
+        description: `${scanType} results for ${resultData.patient.name} have been encrypted, stored, and attached to their record.`,
+        status: "success",
+        duration: 4000,
+      });
+
+      setPatientId("");
+      setScanType("");
+      setFindings("");
+      setSelectedFiles([]);
+      loadResults();
+    } catch (err) {
+      toast({
+        title: "Upload failed",
+        description: err.message,
+        status: "error",
+        duration: 4000,
+      });
+    } finally {
+      setIsUploading(false);
+      setTimeout(() => setUploadProgress(0), 1500);
+    }
   };
 
   return (
@@ -397,6 +435,8 @@ const ScanCenterUpload = () => {
                 isDisabled={
                   selectedFiles.length === 0 || !patientId || !scanType
                 }
+                isLoading={isUploading}
+                loadingText="Uploading..."
                 onClick={handleUpload}
               >
                 Upload Results
@@ -444,13 +484,8 @@ const ScanCenterUpload = () => {
                         </Text>
                         <HStack spacing={4}>
                           <Text fontSize="sm" color="gray.500">
-                            {result.uploadDate} at {result.uploadTime}
+                            {result.uploadDate}
                           </Text>
-                          <Badge
-                            colorScheme={getPriorityColor(result.priority)}
-                          >
-                            {result.priority}
-                          </Badge>
                         </HStack>
                       </VStack>
                     </HStack>
@@ -483,7 +518,7 @@ const ScanCenterUpload = () => {
                           onClick={() =>
                             toast({
                               title: "Downloading",
-                              description: `Downloading ${result.scanType} results (${result.fileSize})`,
+                              description: `Downloading ${result.scanType} results (${result.filesCount} file${result.filesCount === 1 ? "" : "s"})`,
                               status: "info",
                               duration: 2000,
                               isClosable: true,
@@ -508,15 +543,7 @@ const ScanCenterUpload = () => {
                       </Box>
                       <Box>
                         <Text fontSize="xs" color="gray.600">
-                          Size
-                        </Text>
-                        <Text fontSize="sm" fontWeight="medium">
-                          {result.fileSize}
-                        </Text>
-                      </Box>
-                      <Box>
-                        <Text fontSize="xs" color="gray.600">
-                          Technician
+                          Scan Center
                         </Text>
                         <Text fontSize="sm" fontWeight="medium">
                           {result.technician}
@@ -524,13 +551,10 @@ const ScanCenterUpload = () => {
                       </Box>
                       <Box>
                         <Text fontSize="xs" color="gray.600">
-                          Report Status
+                          Encryption
                         </Text>
-                        <Badge
-                          size="sm"
-                          colorScheme={result.reportSent ? "green" : "orange"}
-                        >
-                          {result.reportSent ? "Sent" : "Pending"}
+                        <Badge size="sm" colorScheme="green">
+                          AES-256
                         </Badge>
                       </Box>
                     </SimpleGrid>
