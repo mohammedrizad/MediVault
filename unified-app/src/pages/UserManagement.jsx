@@ -1,4 +1,6 @@
 import React, { useState, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
+import dataService from "../services/DataService";
 import {
   Box,
   Container,
@@ -73,16 +75,6 @@ const UserManagement = () => {
   const [selectedUser, setSelectedUser] = useState(null);
 
   const {
-    isOpen: isAddOpen,
-    onOpen: onAddOpen,
-    onClose: onAddClose,
-  } = useDisclosure();
-  const {
-    isOpen: isEditOpen,
-    onOpen: onEditOpen,
-    onClose: onEditClose,
-  } = useDisclosure();
-  const {
     isOpen: isViewOpen,
     onOpen: onViewOpen,
     onClose: onViewClose,
@@ -91,102 +83,7 @@ const UserManagement = () => {
   const cardBg = useColorModeValue("white", "gray.700");
   const toast = useToast();
 
-  // Mock users data
-  const mockUsers = [
-    {
-      id: 1,
-      name: "Dr. Sarah Johnson",
-      email: "dr.johnson@medivault.com",
-      role: "doctor",
-      status: "active",
-      lastLogin: "2024-11-01 14:30:00",
-      createdAt: "2024-01-15",
-      department: "Cardiology",
-      phone: "+1 (555) 123-4567",
-      avatar: null,
-      loginCount: 234,
-      permissions: ["read_patients", "write_patients", "read_reports"],
-    },
-    {
-      id: 2,
-      name: "Admin User",
-      email: "admin@medivault.com",
-      role: "admin",
-      status: "active",
-      lastLogin: "2024-11-01 15:00:00",
-      createdAt: "2024-01-01",
-      department: "Administration",
-      phone: "+1 (555) 987-6543",
-      avatar: null,
-      loginCount: 567,
-      permissions: ["full_access"],
-    },
-    {
-      id: 3,
-      name: "Nurse Maria Garcia",
-      email: "nurse.garcia@medivault.com",
-      role: "nurse",
-      status: "active",
-      lastLogin: "2024-11-01 13:45:00",
-      createdAt: "2024-02-20",
-      department: "Emergency",
-      phone: "+1 (555) 456-7890",
-      avatar: null,
-      loginCount: 189,
-      permissions: ["read_patients", "update_vitals", "register_patients"],
-    },
-    {
-      id: 4,
-      name: "John Smith",
-      email: "patient.smith@medivault.com",
-      role: "patient",
-      status: "active",
-      lastLogin: "2024-11-01 12:30:00",
-      createdAt: "2024-03-10",
-      department: "N/A",
-      phone: "+1 (555) 321-0987",
-      avatar: null,
-      loginCount: 45,
-      permissions: ["read_own_records", "book_appointments"],
-    },
-    {
-      id: 5,
-      name: "RadiCare Center",
-      email: "scan@radicare.com",
-      role: "scancenter",
-      status: "active",
-      lastLogin: "2024-11-01 11:15:00",
-      createdAt: "2024-02-05",
-      department: "Radiology",
-      phone: "+1 (555) 654-3210",
-      avatar: null,
-      loginCount: 123,
-      permissions: ["upload_scans", "read_scan_requests", "update_reports"],
-    },
-    {
-      id: 6,
-      name: "Dr. Michael Brown",
-      email: "dr.brown@medivault.com",
-      role: "doctor",
-      status: "inactive",
-      lastLogin: "2024-10-25 16:20:00",
-      createdAt: "2024-01-30",
-      department: "Neurology",
-      phone: "+1 (555) 111-2222",
-      avatar: null,
-      loginCount: 156,
-      permissions: ["read_patients", "write_patients"],
-    },
-  ];
-
-  const [newUser, setNewUser] = useState({
-    name: "",
-    email: "",
-    role: "doctor",
-    department: "",
-    phone: "",
-    permissions: [],
-  });
+  const navigate = useNavigate();
 
   const stats = [
     {
@@ -219,14 +116,88 @@ const UserManagement = () => {
     },
   ];
 
-  useEffect(() => {
-    // Simulate loading users
-    const timer = setTimeout(() => {
-      setUsers(mockUsers);
-      setLoading(false);
-    }, 1000);
+  const loadUsers = async () => {
+    setLoading(true);
+    try {
+      const [doctors, nurses, scanCenters, patients] = await Promise.all([
+        dataService.getDoctors(),
+        dataService.getNurses(),
+        dataService.getScanCenters(),
+        dataService.getPatients(),
+      ]);
 
-    return () => clearTimeout(timer);
+      const combined = [
+        ...doctors.map((d) => ({
+          id: d._id,
+          name: d.Doctor_name,
+          email: d.Email_Address,
+          role: "doctor",
+          status: "active",
+          lastLogin: "N/A",
+          createdAt: d.Date_Joined || "N/A",
+          department: d.Specialization || "N/A",
+          phone: d.PhoneNo || "N/A",
+          avatar: null,
+          permissions: ["read_patients", "write_patients", "read_reports"],
+        })),
+        ...nurses.map((n) => ({
+          id: n._id,
+          name: n.Doctor_name,
+          email: n.Email_Address,
+          role: "nurse",
+          status: "active",
+          lastLogin: "N/A",
+          createdAt: n.Date_Joined || "N/A",
+          department: n.Specialization || "N/A",
+          phone: n.PhoneNo || "N/A",
+          avatar: null,
+          permissions: ["read_patients", "update_vitals", "register_patients"],
+        })),
+        ...scanCenters.map((s) => ({
+          id: s._id,
+          name: s.username,
+          email: s.Email_Address,
+          role: "scancenter",
+          status: "active",
+          lastLogin: "N/A",
+          createdAt: s.Date_Joined || "N/A",
+          department: s.Specialization || "N/A",
+          phone: "N/A",
+          avatar: null,
+          permissions: ["upload_scans", "read_scan_requests", "update_reports"],
+        })),
+        ...patients.map((p) => ({
+          id: p._id,
+          name: p.name || "N/A",
+          email: p.email || "N/A",
+          role: "patient",
+          status: (p.status || "Active").toLowerCase(),
+          lastLogin: "N/A",
+          createdAt: "N/A",
+          department: p.condition || "N/A",
+          phone: p.phone || "N/A",
+          avatar: null,
+          permissions: ["read_own_records", "book_appointments"],
+        })),
+      ];
+
+      setUsers(combined);
+    } catch (err) {
+      console.error("Failed to load users:", err);
+      toast({
+        title: "Failed to load users",
+        description: err.message,
+        status: "error",
+        duration: 4000,
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    loadUsers();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const getRoleColor = (role) => {
@@ -263,69 +234,71 @@ const UserManagement = () => {
     return matchesSearch && matchesRole && matchesStatus;
   });
 
-  const handleAddUser = () => {
-    const user = {
-      id: Date.now(),
-      ...newUser,
-      status: "active",
-      lastLogin: "Never",
-      createdAt: new Date().toISOString().split("T")[0],
-      avatar: null,
-      loginCount: 0,
-      permissions: newUser.permissions || [],
-    };
-
-    setUsers([...users, user]);
-    setNewUser({
-      name: "",
-      email: "",
-      role: "doctor",
-      department: "",
-      phone: "",
-      permissions: [],
-    });
-    onAddClose();
-
-    toast({
-      title: "User Added",
-      description: `${user.name} has been added successfully.`,
-      status: "success",
-      duration: 3000,
-      isClosable: true,
-    });
+  // Patients have a real `status` field in the schema; doctors/nurses/
+  // scan centers don't, so toggling is only meaningful (and persisted)
+  // for patients.
+  const handleToggleStatus = async (user) => {
+    if (user.role !== "patient") {
+      toast({
+        title: "Not supported",
+        description: `${user.role}s don't have an active/inactive status field yet.`,
+        status: "info",
+        duration: 3000,
+      });
+      return;
+    }
+    const newStatus = user.status === "active" ? "Inactive" : "Active";
+    try {
+      await dataService.updatePatient(user.id, { status: newStatus });
+      toast({
+        title: "Status Updated",
+        description: `${user.name}'s status is now ${newStatus}.`,
+        status: "success",
+        duration: 3000,
+      });
+      loadUsers();
+    } catch (err) {
+      toast({
+        title: "Failed to update status",
+        description: err.message,
+        status: "error",
+        duration: 3000,
+      });
+    }
   };
 
-  const handleToggleStatus = (userId) => {
-    setUsers(
-      users.map((user) =>
-        user.id === userId
-          ? {
-              ...user,
-              status: user.status === "active" ? "inactive" : "active",
-            }
-          : user
-      )
-    );
-
-    toast({
-      title: "Status Updated",
-      description: "User status has been updated successfully.",
-      status: "success",
-      duration: 3000,
-      isClosable: true,
-    });
-  };
-
-  const handleDeleteUser = (userId) => {
-    setUsers(users.filter((user) => user.id !== userId));
-
-    toast({
-      title: "User Deleted",
-      description: "User has been removed successfully.",
-      status: "success",
-      duration: 3000,
-      isClosable: true,
-    });
+  const handleDeleteUser = async (user) => {
+    if (!window.confirm(`Delete ${user.name}? This cannot be undone.`)) return;
+    try {
+      if (user.role === "doctor") await dataService.deleteDoctor(user.id);
+      else if (user.role === "nurse") await dataService.deleteNurse(user.id);
+      else if (user.role === "scancenter")
+        await dataService.deleteScanCenter(user.id);
+      else if (user.role === "patient") await dataService.deletePatient(user.id);
+      else {
+        toast({
+          title: "Cannot delete",
+          description: "Admin users can't be deleted from here.",
+          status: "warning",
+          duration: 3000,
+        });
+        return;
+      }
+      toast({
+        title: "User Deleted",
+        description: `${user.name} has been removed successfully.`,
+        status: "success",
+        duration: 3000,
+      });
+      loadUsers();
+    } catch (err) {
+      toast({
+        title: "Failed to delete user",
+        description: err.message,
+        status: "error",
+        duration: 3000,
+      });
+    }
   };
 
   const handleViewUser = (user) => {
@@ -333,10 +306,31 @@ const UserManagement = () => {
     onViewOpen();
   };
 
+  const MANAGE_ROUTE_BY_ROLE = {
+    doctor: "/admin/doctors",
+    nurse: "/admin/nurses",
+    scancenter: "/admin/scancenters",
+    patient: "/admin/patients",
+  };
+
   const handleEditUser = (user) => {
-    setSelectedUser(user);
-    setNewUser(user);
-    onEditOpen();
+    const route = MANAGE_ROUTE_BY_ROLE[user.role];
+    if (!route) {
+      toast({
+        title: "Cannot edit",
+        description: "Admin users can't be edited from here.",
+        status: "warning",
+        duration: 3000,
+      });
+      return;
+    }
+    toast({
+      title: "Opening management page",
+      description: `Edit ${user.name} from the ${user.role} management page.`,
+      status: "info",
+      duration: 2500,
+    });
+    navigate(route);
   };
 
   return (
@@ -352,9 +346,25 @@ const UserManagement = () => {
               Manage system users, roles, and permissions
             </Text>
           </VStack>
-          <Button leftIcon={<FiPlus />} colorScheme="blue" onClick={onAddOpen}>
-            Add New User
-          </Button>
+          <Menu>
+            <MenuButton as={Button} leftIcon={<FiPlus />} colorScheme="blue">
+              Add New User
+            </MenuButton>
+            <MenuList>
+              <MenuItem onClick={() => navigate("/admin/add-doctor")}>
+                Add Doctor
+              </MenuItem>
+              <MenuItem onClick={() => navigate("/admin/add-nurse")}>
+                Add Nurse
+              </MenuItem>
+              <MenuItem onClick={() => navigate("/admin/add-scancenter")}>
+                Add Scan Center
+              </MenuItem>
+              <MenuItem onClick={() => navigate("/admin/add-patient")}>
+                Add Patient
+              </MenuItem>
+            </MenuList>
+          </Menu>
         </Flex>
 
         {/* Stats Grid */}
@@ -502,20 +512,18 @@ const UserManagement = () => {
                           <Switch
                             size="sm"
                             isChecked={user.status === "active"}
-                            onChange={() => handleToggleStatus(user.id)}
+                            onChange={() => handleToggleStatus(user)}
                           />
                         </HStack>
                       </Td>
                       <Td>
-                        <Text fontSize="sm">
-                          {user.lastLogin === "Never"
-                            ? "Never"
-                            : new Date(user.lastLogin).toLocaleDateString()}
+                        <Text fontSize="sm" color="gray.500">
+                          Not tracked
                         </Text>
                       </Td>
                       <Td>
-                        <Text fontSize="sm" fontWeight="medium">
-                          {user.loginCount}
+                        <Text fontSize="sm" color="gray.500">
+                          Not tracked
                         </Text>
                       </Td>
                       <Td>
@@ -539,13 +547,10 @@ const UserManagement = () => {
                             >
                               Edit User
                             </MenuItem>
-                            <MenuItem icon={<FiLock />}>
-                              Reset Password
-                            </MenuItem>
                             <MenuItem
                               icon={<FiTrash2 />}
                               color="red.500"
-                              onClick={() => handleDeleteUser(user.id)}
+                              onClick={() => handleDeleteUser(user)}
                             >
                               Delete User
                             </MenuItem>
@@ -561,86 +566,6 @@ const UserManagement = () => {
         </Card>
 
         {/* Add User Modal */}
-        <Modal isOpen={isAddOpen} onClose={onAddClose} size="lg">
-          <ModalOverlay />
-          <ModalContent>
-            <ModalHeader>Add New User</ModalHeader>
-            <ModalCloseButton />
-            <ModalBody>
-              <VStack spacing={4}>
-                <FormControl>
-                  <FormLabel>Full Name</FormLabel>
-                  <Input
-                    value={newUser.name}
-                    onChange={(e) =>
-                      setNewUser({ ...newUser, name: e.target.value })
-                    }
-                    placeholder="Enter full name"
-                  />
-                </FormControl>
-
-                <FormControl>
-                  <FormLabel>Email</FormLabel>
-                  <Input
-                    type="email"
-                    value={newUser.email}
-                    onChange={(e) =>
-                      setNewUser({ ...newUser, email: e.target.value })
-                    }
-                    placeholder="Enter email address"
-                  />
-                </FormControl>
-
-                <FormControl>
-                  <FormLabel>Role</FormLabel>
-                  <Select
-                    value={newUser.role}
-                    onChange={(e) =>
-                      setNewUser({ ...newUser, role: e.target.value })
-                    }
-                  >
-                    <option value="doctor">Doctor</option>
-                    <option value="nurse">Nurse</option>
-                    <option value="admin">Admin</option>
-                    <option value="scancenter">Scan Center</option>
-                  </Select>
-                </FormControl>
-
-                <FormControl>
-                  <FormLabel>Department</FormLabel>
-                  <Input
-                    value={newUser.department}
-                    onChange={(e) =>
-                      setNewUser({ ...newUser, department: e.target.value })
-                    }
-                    placeholder="Enter department"
-                  />
-                </FormControl>
-
-                <FormControl>
-                  <FormLabel>Phone</FormLabel>
-                  <Input
-                    value={newUser.phone}
-                    onChange={(e) =>
-                      setNewUser({ ...newUser, phone: e.target.value })
-                    }
-                    placeholder="Enter phone number"
-                  />
-                </FormControl>
-              </VStack>
-            </ModalBody>
-
-            <ModalFooter>
-              <Button variant="ghost" mr={3} onClick={onAddClose}>
-                Cancel
-              </Button>
-              <Button colorScheme="blue" onClick={handleAddUser}>
-                Add User
-              </Button>
-            </ModalFooter>
-          </ModalContent>
-        </Modal>
-
         {/* View User Modal */}
         <Modal isOpen={isViewOpen} onClose={onViewClose} size="lg">
           <ModalOverlay />
@@ -694,13 +619,13 @@ const UserManagement = () => {
                       <Text fontSize="sm" fontWeight="medium" color="gray.600">
                         Last Login
                       </Text>
-                      <Text>{selectedUser.lastLogin}</Text>
+                      <Text color="gray.500">Not tracked</Text>
                     </Box>
                     <Box>
                       <Text fontSize="sm" fontWeight="medium" color="gray.600">
                         Login Count
                       </Text>
-                      <Text>{selectedUser.loginCount}</Text>
+                      <Text color="gray.500">Not tracked</Text>
                     </Box>
                   </SimpleGrid>
 
