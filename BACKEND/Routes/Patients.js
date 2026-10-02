@@ -746,15 +746,21 @@ route.post(
   async (req, res) => {
     try {
       const { _id, preciption, Doctor } = req.body;
-      const doctor = await DoctorSchema.findById(Doctor);
-      const hospital = await AdminSchema.findById(doctor.AdminID);
+      const doctor = await DoctorSchema.findById(Doctor).select("-Password");
+      const hospital = doctor
+        ? await AdminSchema.findById(doctor.AdminID).select("-password")
+        : null;
 
       const result = await PatientSchemas.findOneAndUpdate(
         { _id, "History.Date": simpleFormattedDate },
         {
           $set: {
             "History.$.preciption": preciption,
-            "History.$.DoctorDetails": { doctor, hospital },
+            "History.$.DoctorDetails": {
+              name: doctor?.Doctor_name,
+              specialization: doctor?.Specialization,
+              hospitalName: hospital?.hospitalName,
+            },
           },
         },
       );
@@ -769,6 +775,7 @@ route.post(
         });
       }
     } catch (err) {
+      console.error("Update prescription error:", err);
       res.json({
         msg: "Error Occurred in Update Precription",
       });

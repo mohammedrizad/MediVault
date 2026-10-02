@@ -15,9 +15,26 @@ import {
   HStack,
   List,
   ListItem,
+  Button,
+  Modal,
+  ModalOverlay,
+  ModalContent,
+  ModalHeader,
+  ModalCloseButton,
+  ModalBody,
+  ModalFooter,
+  FormControl,
+  FormLabel,
+  Input,
+  Textarea,
+  useDisclosure,
+  useToast,
+  IconButton,
 } from "@chakra-ui/react";
+import { FiPlus, FiTrash2 } from "react-icons/fi";
 import { useParams } from "react-router-dom";
 import dataService from "../services/DataService";
+import { useAuth } from "../context/AuthContext";
 
 const formatDisplayValue = (value) => {
   if (value === null || value === undefined || value === "") return "N/A";
@@ -39,32 +56,148 @@ const Value = ({ label, value }) => (
   </Box>
 );
 
+const emptyVisitForm = {
+  disease: "",
+  bp: "",
+  pulse: "",
+  temp: "",
+  spo2: "",
+  notes: "",
+};
+
 const DoctorPatientDetails = () => {
   const { id } = useParams();
+  const { currentUser } = useAuth();
+  const toast = useToast();
+  const { isOpen, onOpen, onClose } = useDisclosure();
   const [patient, setPatient] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const [submitting, setSubmitting] = useState(false);
+  const [visitForm, setVisitForm] = useState(emptyVisitForm);
+  const [prescriptionLines, setPrescriptionLines] = useState([
+    { medication: "", dosage: "", frequency: "" },
+  ]);
+
+  const API_URL = process.env.REACT_APP_API_URL || "http://localhost:5002";
+
+  const loadPatient = async () => {
+    try {
+      setLoading(true);
+      setError("");
+      const result = await dataService.searchPatient(id);
+      if (!result) {
+        setError("Patient not found");
+        return;
+      }
+      setPatient(result);
+    } catch (err) {
+      setError(err.message || "Failed to load patient details");
+    } finally {
+      setLoading(false);
+    }
+  };
 
   useEffect(() => {
-    const loadPatient = async () => {
-      try {
-        setLoading(true);
-        setError("");
-        const result = await dataService.searchPatient(id);
-        if (!result) {
-          setError("Patient not found");
-          return;
-        }
-        setPatient(result);
-      } catch (err) {
-        setError(err.message || "Failed to load patient details");
-      } finally {
-        setLoading(false);
-      }
-    };
-
     loadPatient();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [id]);
+
+  const resetVisitForm = () => {
+    setVisitForm(emptyVisitForm);
+    setPrescriptionLines([{ medication: "", dosage: "", frequency: "" }]);
+  };
+
+  const authHeaders = () => {
+    const authToken = localStorage.getItem("authToken");
+    return {
+      "Content-Type": "application/json",
+      ...(authToken ? { Authorization: `Bearer ${authToken}` } : {}),
+    };
+  };
+
+  const handleSubmitVisit = async () => {
+    if (!visitForm.disease.trim()) {
+      toast({
+        title: "Diagnosis required",
+        description: "Please enter a diagnosis or reason for visit.",
+        status: "warning",
+        duration: 3000,
+      });
+      return;
+    }
+    setSubmitting(true);
+    try {
+      const entryRes = await fetch(`${API_URL}/patient/entrypatient`, {
+        method: "POST",
+        headers: authHeaders(),
+        body: JSON.stringify({
+          _id: patient._id,
+          disease: visitForm.disease,
+          vitals: {
+            BP: visitForm.bp,
+            Pulse: visitForm.pulse,
+            Temp: visitForm.temp,
+            SpO2: visitForm.spo2,
+          },
+        }),
+      });
+      const entryData = await entryRes.json();
+      if (entryData.msg !== "Datas added successfully") {
+        throw new Error(entryData.msg || "Failed to create visit entry");
+      }
+
+      if (visitForm.notes.trim()) {
+        const notesRes = await fetch(`${API_URL}/patient/notesadded`, {
+          method: "POST",
+          headers: authHeaders(),
+          body: JSON.stringify({ _id: patient._id, notes: visitForm.notes }),
+        });
+        const notesData = await notesRes.json();
+        if (notesData.msg !== "Notes added successfully") {
+          throw new Error(notesData.msg || "Failed to save notes");
+        }
+      }
+
+      const validLines = prescriptionLines.filter((l) => l.medication.trim());
+      if (validLines.length > 0 && currentUser?.id) {
+        const prescRes = await fetch(`${API_URL}/patient/updateprecription`, {
+          method: "POST",
+          headers: authHeaders(),
+          body: JSON.stringify({
+            _id: patient._id,
+            preciption: validLines.map(
+              (l) => `${l.medication} - ${l.dosage || "N/A"} - ${l.frequency || "N/A"}`,
+            ),
+            Doctor: currentUser.id,
+          }),
+        });
+        const prescData = await prescRes.json();
+        if (prescData.msg !== "Precription added successfully") {
+          console.warn("Prescription save warning:", prescData.msg);
+        }
+      }
+
+      toast({
+        title: "Visit recorded",
+        description: "New visit, notes, and prescription have been saved.",
+        status: "success",
+        duration: 3000,
+      });
+      resetVisitForm();
+      onClose();
+      loadPatient();
+    } catch (err) {
+      toast({
+        title: "Failed to record visit",
+        description: err.message,
+        status: "error",
+        duration: 4000,
+      });
+    } finally {
+      setSubmitting(false);
+    }
+  };
 
   if (loading) {
     return (
@@ -92,9 +225,14 @@ const DoctorPatientDetails = () => {
       <VStack align="stretch" spacing={6}>
         <HStack justify="space-between" wrap="wrap">
           <Heading size="lg">Full Patient Details</Heading>
-          <Badge colorScheme={patient.status === "Active" ? "green" : "red"}>
-            {patient.status || "Unknown"}
-          </Badge>
+          <HStack>
+            <Badge colorScheme={patient.status === "Active" ? "green" : "red"}>
+              {patient.status || "Unknown"}
+            </Badge>
+            <Button colorScheme="blue" leftIcon={<FiPlus />} onClick={onOpen}>
+              New Visit
+            </Button>
+          </HStack>
         </HStack>
 
         <Card>
@@ -201,6 +339,160 @@ const DoctorPatientDetails = () => {
           </CardBody>
         </Card>
       </VStack>
+
+      <Modal isOpen={isOpen} onClose={onClose} size="xl">
+        <ModalOverlay />
+        <ModalContent>
+          <ModalHeader>Record New Visit</ModalHeader>
+          <ModalCloseButton />
+          <ModalBody>
+            <VStack spacing={4} align="stretch">
+              <FormControl isRequired>
+                <FormLabel>Diagnosis / Reason for Visit</FormLabel>
+                <Input
+                  placeholder="e.g. Hypertension follow-up"
+                  value={visitForm.disease}
+                  onChange={(e) =>
+                    setVisitForm({ ...visitForm, disease: e.target.value })
+                  }
+                />
+              </FormControl>
+
+              <SimpleGrid columns={2} spacing={4}>
+                <FormControl>
+                  <FormLabel>Blood Pressure</FormLabel>
+                  <Input
+                    placeholder="e.g. 120/80"
+                    value={visitForm.bp}
+                    onChange={(e) =>
+                      setVisitForm({ ...visitForm, bp: e.target.value })
+                    }
+                  />
+                </FormControl>
+                <FormControl>
+                  <FormLabel>Pulse</FormLabel>
+                  <Input
+                    placeholder="e.g. 72"
+                    value={visitForm.pulse}
+                    onChange={(e) =>
+                      setVisitForm({ ...visitForm, pulse: e.target.value })
+                    }
+                  />
+                </FormControl>
+                <FormControl>
+                  <FormLabel>Temperature</FormLabel>
+                  <Input
+                    placeholder="e.g. 98.6 F"
+                    value={visitForm.temp}
+                    onChange={(e) =>
+                      setVisitForm({ ...visitForm, temp: e.target.value })
+                    }
+                  />
+                </FormControl>
+                <FormControl>
+                  <FormLabel>SpO2</FormLabel>
+                  <Input
+                    placeholder="e.g. 98%"
+                    value={visitForm.spo2}
+                    onChange={(e) =>
+                      setVisitForm({ ...visitForm, spo2: e.target.value })
+                    }
+                  />
+                </FormControl>
+              </SimpleGrid>
+
+              <FormControl>
+                <FormLabel>Notes</FormLabel>
+                <Textarea
+                  placeholder="Clinical notes for this visit..."
+                  value={visitForm.notes}
+                  onChange={(e) =>
+                    setVisitForm({ ...visitForm, notes: e.target.value })
+                  }
+                />
+              </FormControl>
+
+              <Box>
+                <HStack justify="space-between" mb={2}>
+                  <FormLabel mb={0}>Prescription</FormLabel>
+                  <Button
+                    size="sm"
+                    leftIcon={<FiPlus />}
+                    variant="outline"
+                    onClick={() =>
+                      setPrescriptionLines([
+                        ...prescriptionLines,
+                        { medication: "", dosage: "", frequency: "" },
+                      ])
+                    }
+                  >
+                    Add Medication
+                  </Button>
+                </HStack>
+                <VStack spacing={2} align="stretch">
+                  {prescriptionLines.map((line, idx) => (
+                    <HStack key={idx}>
+                      <Input
+                        placeholder="Medication"
+                        value={line.medication}
+                        onChange={(e) => {
+                          const updated = [...prescriptionLines];
+                          updated[idx].medication = e.target.value;
+                          setPrescriptionLines(updated);
+                        }}
+                      />
+                      <Input
+                        placeholder="Dosage"
+                        value={line.dosage}
+                        onChange={(e) => {
+                          const updated = [...prescriptionLines];
+                          updated[idx].dosage = e.target.value;
+                          setPrescriptionLines(updated);
+                        }}
+                      />
+                      <Input
+                        placeholder="Frequency"
+                        value={line.frequency}
+                        onChange={(e) => {
+                          const updated = [...prescriptionLines];
+                          updated[idx].frequency = e.target.value;
+                          setPrescriptionLines(updated);
+                        }}
+                      />
+                      <IconButton
+                        aria-label="Remove medication"
+                        icon={<FiTrash2 />}
+                        size="sm"
+                        variant="ghost"
+                        colorScheme="red"
+                        isDisabled={prescriptionLines.length === 1}
+                        onClick={() =>
+                          setPrescriptionLines(
+                            prescriptionLines.filter((_, i) => i !== idx),
+                          )
+                        }
+                      />
+                    </HStack>
+                  ))}
+                </VStack>
+              </Box>
+            </VStack>
+          </ModalBody>
+          <ModalFooter>
+            <Button variant="ghost" mr={3} onClick={onClose}>
+              Cancel
+            </Button>
+            <Button
+              colorScheme="blue"
+              onClick={handleSubmitVisit}
+              isLoading={submitting}
+              loadingText="Saving..."
+            >
+              Save Visit
+            </Button>
+          </ModalFooter>
+        </ModalContent>
+      </Modal>
     </Box>
   );
 };
